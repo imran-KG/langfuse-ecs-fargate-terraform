@@ -1,0 +1,140 @@
+# =============================================================================
+# Security Group for Langfuse Web
+# =============================================================================
+resource "aws_security_group" "web" {
+  name        = "${var.service_name}-web"
+  description = "Security group for Langfuse Web"
+  vpc_id      = var.vpc_id
+
+  # Ingress: Direct access only when ALB is disabled
+  # When ALB is enabled, traffic comes from ALB (rule added in alb.tf)
+  dynamic "ingress" {
+    for_each = var.enable_alb ? [] : [1]
+    content {
+      description = "Langfuse Web from allowed CIDRs (no ALB mode)"
+      from_port   = 3000
+      to_port     = 3000
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_cidrs
+    }
+  }
+
+  # Egress: Allow all outbound traffic
+  # Required for: RDS, Redis, ClickHouse, S3 VPC Endpoint, external LLM APIs
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.service_name}-web"
+  }
+}
+
+# =============================================================================
+# Security Group for Langfuse Worker
+# =============================================================================
+resource "aws_security_group" "worker" {
+  name        = "${var.service_name}-worker"
+  description = "Security group for Langfuse Worker"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "Health check from Web"
+    from_port       = 3030
+    to_port         = 3030
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.service_name}-worker"
+  }
+}
+
+# =============================================================================
+# Security Group for ClickHouse
+# =============================================================================
+resource "aws_security_group" "clickhouse" {
+  name        = "${var.service_name}-clickhouse"
+  description = "Security group for ClickHouse"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "ClickHouse HTTP from Web/Worker"
+    from_port       = 8123
+    to_port         = 8123
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id, aws_security_group.worker.id]
+  }
+
+  ingress {
+    description     = "ClickHouse TCP from Web/Worker"
+    from_port       = 9000
+    to_port         = 9000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id, aws_security_group.worker.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.service_name}-clickhouse"
+  }
+}
+
+# =============================================================================
+# Security Group for RDS PostgreSQL
+# =============================================================================
+resource "aws_security_group" "rds" {
+  name        = "${var.service_name}-rds"
+  description = "Security group for RDS PostgreSQL"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "PostgreSQL from Web/Worker"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web.id, aws_security_group.worker.id]
+  }
+
+  tags = {
+    Name = "${var.service_name}-rds"
+  }
+}
+
+# =============================================================================
+# Security Group for EFS
+# =============================================================================
+resource "aws_security_group" "efs" {
+  name        = "${var.service_name}-efs"
+  description = "Security group for EFS"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description     = "NFS from ClickHouse"
+    from_port       = 2049
+    to_port         = 2049
+    protocol        = "tcp"
+    security_groups = [aws_security_group.clickhouse.id]
+  }
+
+  tags = {
+    Name = "${var.service_name}-efs"
+  }
+}

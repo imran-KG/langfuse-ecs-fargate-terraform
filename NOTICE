@@ -1,0 +1,17 @@
+NOTICE
+
+This project includes code adapted from:
+
+  terraform-aws-langfuse-ecs
+  https://github.com/myui/terraform-aws-langfuse-ecs
+  Copyright (c) myui
+  Licensed under the Apache License, Version 2.0
+
+  You may obtain a copy of the Apache License at:
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  The adapted portions include Terraform module structure and ECS task
+  configuration. Modifications have been made to the original code.
+
+The remainder of this project is original work by Imran Gummanahalli
+and is licensed under the MIT License — see LICENSE for details.
